@@ -360,5 +360,30 @@ describe("ONNX Serializer", () => {
     it("should handle INT32 type", () => {
       expect(OnnxDataType.INT32).toBe(6);
     });
+
+    it("should throw when serializing invalid elemType string instead of enum", () => {
+      const model = {
+        irVersion: 8n,
+        opsetImports: [{ domain: '', version: 17n }],
+        producerName: 'test',
+        producerVersion: '1.0.0',
+        graph: {
+          name: 'test_graph',
+          nodes: [],
+          inputs: [{
+            name: 'input',
+            // Intentionally using a string instead of enum to test runtime error
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            elemType: 'FLOAT' as any,
+            shape: [{ dimValue: 1n }]
+          }],
+          outputs: [],
+          initializers: []
+        }
+      };
+
+      // BigInt('FLOAT') throws SyntaxError when writeVarint tries to serialize
+      expect(() => serializeOnnx(model)).toThrow();
+    });
   });
 });

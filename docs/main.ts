@@ -2,7 +2,7 @@
  * RVC to ONNX Converter - Demo App
  */
 
-import { pthToOnnx, parsePth } from 'rvc-onnx-web';
+import { pthToOnnx, parsePth, type RvcConfig } from 'rvc-onnx-web';
 
 // DOM Elements
 const uploadZone = document.getElementById('uploadZone')!;
@@ -109,8 +109,8 @@ async function handleFile(file: File) {
 }
 
 // Display model configuration
-function displayConfig(config: Record<string, unknown>) {
-  const displayItems = [
+function displayConfig(config: RvcConfig) {
+  const displayItems: { label: string; key: keyof RvcConfig; isArray?: boolean }[] = [
     { label: 'Hidden Channels', key: 'hiddenChannels' },
     { label: 'Inter Channels', key: 'interChannels' },
     { label: 'Filter Channels', key: 'filterChannels' },
@@ -175,13 +175,13 @@ async function startConversion() {
     setProgress(80, 'Serializing ONNX model...');
     log('Serializing to ONNX format...');
     
-    // Convert
-    const onnxBytes = await pthToOnnx(await currentFile.arrayBuffer(), {
+    // Convert - pthToOnnx accepts File directly via overloads
+    const result = await pthToOnnx(currentFile, {
       opsetVersion: 17,
       phoneLen: 100
     });
     
-    onnxBlob = new Blob([onnxBytes], { type: 'application/octet-stream' });
+    onnxBlob = new Blob([result.onnxBuffer.slice()], { type: 'application/octet-stream' });
     
     const elapsed = ((performance.now() - startTime) / 1000).toFixed(2);
     const sizeInMB = (onnxBlob.size / 1024 / 1024).toFixed(2);

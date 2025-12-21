@@ -1,5 +1,6 @@
 
 import { describe, it, expect, vi } from 'vitest';
+import { OnnxDataType } from '../src/types';
 import { 
   linear, 
   attrFloats, 
@@ -66,9 +67,9 @@ describe('ONNX Builder Helpers', () => {
   });
 
   it('should create value info with dynamic dimensions', () => {
-    const info = valueInfo('test', 'FLOAT', ['batch', 10]);
+    const info = valueInfo('test', OnnxDataType.FLOAT, ['batch', 10]);
     expect(info.name).toBe('test');
-    expect(info.elemType).toBe('FLOAT');
+    expect(info.elemType).toBe(OnnxDataType.FLOAT);
     expect(info.shape).toEqual([
       { dimParam: 'batch' },
       { dimValue: 10n }

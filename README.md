@@ -37,11 +37,13 @@ import { readFileSync, writeFileSync } from 'fs';
 // Load your .pth model
 const pthBuffer = readFileSync('MyVoiceModel.pth');
 
-// Convert to ONNX
-const onnxBuffer = await pthToOnnx(pthBuffer.buffer, {
+// Convert to ONNX (accepts Buffer directly via Uint8Array overload)
+const { onnxBuffer, sampleRate } = await pthToOnnx(pthBuffer, {
   opsetVersion: 17,
   phoneLen: 100  // Dynamic shapes supported
 });
+
+console.log(`Model sample rate: ${sampleRate}`);
 
 // Save the result
 writeFileSync('MyVoiceModel.onnx', Buffer.from(onnxBuffer));
@@ -58,8 +60,10 @@ fileInput.addEventListener('change', async (e) => {
   const file = fileInput.files?.[0];
   if (!file) return;
 
-  const arrayBuffer = await file.arrayBuffer();
-  const onnxBuffer = await pthToOnnx(arrayBuffer, { opsetVersion: 17 });
+  // pthToOnnx accepts File directly (also supports ArrayBuffer, Blob, URL, etc.)
+  const { onnxBuffer, sampleRate, checkpoint } = await pthToOnnx(file, { opsetVersion: 17 });
+
+  console.log(`Converted model: ${sampleRate}Hz, ${checkpoint.weights.size} weights`);
 
   // Download the converted model
   const blob = new Blob([onnxBuffer], { type: 'application/octet-stream' });
@@ -73,17 +77,26 @@ fileInput.addEventListener('change', async (e) => {
 
 ## 📖 API Reference
 
-### `pthToOnnx(buffer, options)`
+### `pthToOnnx(input, options)`
 
 Converts a PyTorch .pth checkpoint to ONNX format.
 
 **Parameters:**
-- `buffer: ArrayBuffer` - The raw .pth file contents
+- `input: PthInput` - The .pth file in any supported format:
+  - `ArrayBuffer` - Raw binary data
+  - `Uint8Array` - Byte array
+  - `File` - Browser File object
+  - `Blob` - Browser Blob object
+  - `Response` - Fetch Response object
+  - `URL | string` - URL to fetch the .pth file from
 - `options: ConvertOptions`
   - `opsetVersion?: number` - ONNX opset version (default: 17)
   - `phoneLen?: number` - Sequence length for graph construction (default: 100)
 
-**Returns:** `Promise<Uint8Array>` - The serialized ONNX model
+**Returns:** `Promise<ConversionResult>`
+  - `onnxBuffer: Uint8Array` - The serialized ONNX model
+  - `checkpoint: ParsedCheckpoint` - Parsed model metadata and weights
+  - `sampleRate: number` - Model sample rate (e.g., 40000, 48000)
 
 ### `parsePth(buffer)`
 
