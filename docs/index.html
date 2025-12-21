@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RVC to ONNX Converter</title>
+  <meta name="description" content="Convert RVC voice models (.pth) to ONNX format - runs entirely in your browser">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎤</text></svg>">
+  <style>
+    :root {
+      --bg-primary: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-card: #21262d;
+      --accent: #58a6ff;
+      --accent-hover: #79b8ff;
+      --accent-green: #3fb950;
+      --text-primary: #f0f6fc;
+      --text-secondary: #8b949e;
+      --border: #30363d;
+      --error: #f85149;
+      --warning: #d29922;
+    }
+    
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+    
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans', Helvetica, Arial, sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem;
+    }
+    
+    header {
+      text-align: center;
+      margin-bottom: 2rem;
+      padding-bottom: 2rem;
+      border-bottom: 1px solid var(--border);
+    }
+    
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+    
+    .subtitle {
+      color: var(--text-secondary);
+      font-size: 1.1rem;
+    }
+    
+    .badges {
+      display: flex;
+      justify-content: center;
+      gap: 0.5rem;
+      margin-top: 1rem;
+      flex-wrap: wrap;
+    }
+    
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.25rem;
+      padding: 0.25rem 0.75rem;
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 2rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    
+    .badge.green { border-color: var(--accent-green); color: var(--accent-green); }
+    .badge.blue { border-color: var(--accent); color: var(--accent); }
+    
+    .card {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1.5rem;
+      margin-bottom: 1rem;
+    }
+    
+    .card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    
+    .upload-zone {
+      border: 2px dashed var(--border);
+      border-radius: 6px;
+      padding: 3rem 2rem;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    
+    .upload-zone:hover,
+    .upload-zone.dragover {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.1);
+    }
+    
+    .upload-zone.has-file {
+      border-color: var(--accent-green);
+      background: rgba(63, 185, 80, 0.1);
+    }
+    
+    .upload-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+    }
+    
+    .upload-text {
+      color: var(--text-secondary);
+    }
+    
+    .upload-text strong {
+      color: var(--text-primary);
+    }
+    
+    .file-name {
+      color: var(--accent-green);
+      font-weight: 600;
+      margin-top: 0.5rem;
+      font-family: 'SF Mono', 'Consolas', monospace;
+    }
+    
+    input[type="file"] {
+      display: none;
+    }
+    
+    .config-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+      gap: 0.75rem;
+    }
+    
+    .config-item {
+      background: var(--bg-card);
+      padding: 0.75rem;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+    }
+    
+    .config-label {
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 0.25rem;
+    }
+    
+    .config-value {
+      font-size: 1rem;
+      font-weight: 600;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      color: var(--accent);
+    }
+    
+    .config-value.array {
+      font-size: 0.8rem;
+      word-break: break-all;
+    }
+    
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+      background: var(--accent);
+      color: var(--bg-primary);
+      border: none;
+      padding: 0.875rem 1.5rem;
+      font-size: 1rem;
+      font-weight: 600;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      width: 100%;
+    }
+    
+    .btn:hover:not(:disabled) {
+      background: var(--accent-hover);
+    }
+    
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    
+    .btn.success {
+      background: var(--accent-green);
+    }
+    
+    .progress-container {
+      display: none;
+      margin-top: 1rem;
+    }
+    
+    .progress-container.visible {
+      display: block;
+    }
+    
+    .progress-bar {
+      height: 8px;
+      background: var(--bg-card);
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--accent), var(--accent-green));
+      width: 0%;
+      transition: width 0.3s ease;
+    }
+    
+    .progress-text {
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
+    
+    .log-container {
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      max-height: 250px;
+      overflow-y: auto;
+      font-family: 'SF Mono', 'Consolas', monospace;
+      font-size: 0.8rem;
+    }
+    
+    .log-entry {
+      padding: 0.2rem 0;
+    }
+    
+    .log-entry.info { color: var(--text-secondary); }
+    .log-entry.success { color: var(--accent-green); }
+    .log-entry.warning { color: var(--warning); }
+    .log-entry.error { color: var(--error); }
+    
+    .download-section {
+      text-align: center;
+      padding: 1.5rem;
+    }
+    
+    .stats {
+      display: flex;
+      justify-content: center;
+      gap: 1.5rem;
+      margin-top: 1rem;
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+    
+    .hidden {
+      display: none !important;
+    }
+    
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--text-secondary);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+      margin-top: 2rem;
+    }
+    
+    footer a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+    
+    footer a:hover {
+      text-decoration: underline;
+    }
+    
+    .privacy-note {
+      background: rgba(63, 185, 80, 0.1);
+      border: 1px solid rgba(63, 185, 80, 0.3);
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1rem;
+      font-size: 0.85rem;
+      color: var(--accent-green);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>🎤 RVC → ONNX</h1>
+      <p class="subtitle">Convert RVC voice models to ONNX format</p>
+      <div class="badges">
+        <span class="badge green">✓ 100% Browser-Based</span>
+        <span class="badge blue">⚡ No Server Required</span>
+        <span class="badge green">🔒 Private & Secure</span>
+      </div>
+    </header>
+    
+    <div class="privacy-note">
+      🔒 Your model files never leave your device. All processing happens locally in your browser.
+    </div>
+    
+    <!-- Upload Section -->
+    <div class="card">
+      <h2>📁 Upload Model</h2>
+      <div class="upload-zone" id="uploadZone">
+        <div class="upload-icon">📦</div>
+        <div class="upload-text">
+          Drag & drop your <strong>.pth</strong> file here<br>
+          or click to browse
+        </div>
+        <div class="file-name" id="fileName"></div>
+      </div>
+      <input type="file" id="fileInput" accept=".pth">
+    </div>
+    
+    <!-- Config Section -->
+    <div class="card hidden" id="configCard">
+      <h2>⚙️ Model Configuration</h2>
+      <div class="config-grid" id="configGrid"></div>
+    </div>
+    
+    <!-- Convert Section -->
+    <div class="card hidden" id="convertCard">
+      <h2>🚀 Convert</h2>
+      <button class="btn" id="convertBtn">Convert to ONNX</button>
+      
+      <div class="progress-container" id="progressContainer">
+        <div class="progress-bar">
+          <div class="progress-fill" id="progressFill"></div>
+        </div>
+        <div class="progress-text" id="progressText">Initializing...</div>
+      </div>
+    </div>
+    
+    <!-- Log Section -->
+    <div class="card hidden" id="logCard">
+      <h2>📋 Log</h2>
+      <div class="log-container" id="logContainer"></div>
+    </div>
+    
+    <!-- Download Section -->
+    <div class="card hidden" id="downloadCard">
+      <div class="download-section">
+        <div style="font-size: 3rem; margin-bottom: 1rem;">✅</div>
+        <h2 style="justify-content: center; margin-bottom: 1rem;">Conversion Complete!</h2>
+        <button class="btn success" id="downloadBtn">
+          ⬇️ Download ONNX Model
+        </button>
+        <div class="stats" id="stats"></div>
+      </div>
+    </div>
+    
+    <footer>
+      <p>
+        <a href="https://github.com/visgotti/rvc-onnx-web">GitHub</a> · 
+        <a href="https://www.npmjs.com/package/rvc-onnx-web">npm</a> · 
+        MIT License
+      </p>
+      <p style="margin-top: 0.5rem;">
+        Built with TypeScript. No Python required.
+      </p>
+    </footer>
+  </div>
+  
+  <script type="module" src="./main.ts"></script>
+</body>
+</html>

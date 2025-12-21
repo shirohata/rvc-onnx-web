@@ -1,0 +1,81 @@
+{
+  "name": "rvc-onnx-web",
+  "version": "1.0.0",
+  "description": "Convert RVC voice models to ONNX in the browser. No Python required.",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./parser": {
+      "import": "./dist/pth-parser.js",
+      "types": "./dist/pth-parser.d.ts"
+    },
+    "./builder": {
+      "import": "./dist/onnx-builder.js",
+      "types": "./dist/onnx-builder.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "clean": "rm -rf dist coverage",
+    "verify": "npm run lint && npm run build && npm run test:coverage",
+    "precommit": "npm run verify",
+    "prepublishOnly": "npm run clean && npm run verify"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/visgotti/rvc-onnx-web.git"
+  },
+  "keywords": [
+    "onnx",
+    "pytorch",
+    "pth",
+    "rvc",
+    "voice",
+    "converter",
+    "browser",
+    "wasm",
+    "machine-learning",
+    "ai",
+    "typescript",
+    "audio"
+  ],
+  "author": "visgotti",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/visgotti/rvc-onnx-web/issues"
+  },
+  "homepage": "https://visgotti.github.io/rvc-onnx-web",
+  "dependencies": {
+    "fflate": "^0.8.2"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.55.0",
+    "onnx-proto": "^8.0.1",
+    "onnxruntime-node": "^1.23.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
