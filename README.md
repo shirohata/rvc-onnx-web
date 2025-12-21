@@ -45,7 +45,7 @@ const { onnxBuffer, sampleRate } = await pthToOnnx(pthBuffer, {
 
 console.log(`Model sample rate: ${sampleRate}`);
 
-// Save the result
+// Save the result§
 writeFileSync('MyVoiceModel.onnx', Buffer.from(onnxBuffer));
 ```
 
