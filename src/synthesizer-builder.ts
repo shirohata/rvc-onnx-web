@@ -20,7 +20,7 @@ import {
   OnnxInitializer,
   OnnxDataType,
   TensorData,
-} from "./types";
+} from "./types.js";
 import {
   resetNameCounter,
   uniqueName,
@@ -58,7 +58,7 @@ import {
   where,
   flip,
   shape,
-} from "./onnx-builder";
+} from "./onnx-builder.js";
 
 // =============================================================================
 // Helper Functions

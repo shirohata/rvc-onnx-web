@@ -14,8 +14,8 @@ import type {
   OnnxDataType,
   OnnxAttribute,
   TensorData,
-} from "./types";
-import { buildSynthesizerGraph } from "./synthesizer-builder";
+} from "./types.js";
+import { buildSynthesizerGraph } from "./synthesizer-builder.js";
 
 export interface BuildOptions {
   opsetVersion: number;
