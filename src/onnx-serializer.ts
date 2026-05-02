@@ -20,7 +20,7 @@ import {
   OnnxAttribute,
   OnnxDataType,
   TensorData,
-} from "./types";
+} from "./types.js";
 
 /**
  * Serialize an ONNX model to binary protobuf format.

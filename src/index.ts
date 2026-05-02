@@ -5,11 +5,11 @@
  * checkpoint files (.pth) to ONNX format entirely in the browser.
  */
 
-export { pthToOnnx, type ConversionOptions, type ConversionResult, type PthInput } from "./converter";
-export { parsePth, type PthCheckpoint } from "./pth-parser";
-export { buildOnnxModel } from "./onnx-builder";
-export { serializeOnnx } from "./onnx-serializer";
-export { Unpickler, PythonObject, type TorchStorage, type DType } from "./pickle";
+export { pthToOnnx, type ConversionOptions, type ConversionResult, type PthInput } from "./converter.js";
+export { parsePth, type PthCheckpoint } from "./pth-parser.js";
+export { buildOnnxModel } from "./onnx-builder.js";
+export { serializeOnnx } from "./onnx-serializer.js";
+export { Unpickler, PythonObject, type TorchStorage, type DType } from "./pickle.js";
 export type { 
   TensorData, 
   RvcConfig, 
@@ -17,5 +17,5 @@ export type {
   OnnxModel,
   OnnxGraph,
   OnnxNode
-} from "./types";
-export { OnnxDataType } from "./types";
+} from "./types.js";
+export { OnnxDataType } from "./types.js";

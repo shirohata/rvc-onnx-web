@@ -2,10 +2,10 @@
  * Main converter module - orchestrates the PTH to ONNX conversion.
  */
 
-import { parsePth } from "./pth-parser";
-import { buildOnnxModel } from "./onnx-builder";
-import { serializeOnnx } from "./onnx-serializer";
-import type { ParsedCheckpoint } from "./types";
+import { parsePth } from "./pth-parser.js";
+import { buildOnnxModel } from "./onnx-builder.js";
+import { serializeOnnx } from "./onnx-serializer.js";
+import type { ParsedCheckpoint } from "./types.js";
 
 /**
  * Options for the conversion process.

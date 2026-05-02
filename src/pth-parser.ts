@@ -15,8 +15,8 @@ import {
   ParsedCheckpoint,
   RvcConfig,
   TensorData,
-} from "./types";
-import { Unpickler, TorchStorage } from "./pickle";
+} from "./types.js";
+import { Unpickler, TorchStorage } from "./pickle.js";
 
 /**
  * Represents the raw structure of a PyTorch checkpoint.
