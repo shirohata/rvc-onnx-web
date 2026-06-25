@@ -5,7 +5,14 @@
  * checkpoint files (.pth) to ONNX format entirely in the browser.
  */
 
-export { pthToOnnx, type ConversionOptions, type ConversionResult, type PthInput } from "./converter.js";
+export {
+  pthToOnnx,
+  type ConversionOptions,
+  type ConversionResult,
+  type ExportMode,
+  type PthInput,
+  type TargetRuntime,
+} from "./converter.js";
 export { parsePth, type PthCheckpoint } from "./pth-parser.js";
 export { buildOnnxModel } from "./onnx-builder.js";
 export { serializeOnnx } from "./onnx-serializer.js";
