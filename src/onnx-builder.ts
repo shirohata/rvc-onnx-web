@@ -17,9 +17,14 @@ import type {
 } from "./types.js";
 import { buildSynthesizerGraph } from "./synthesizer-builder.js";
 
+export type ExportMode = "default" | "webui";
+export type TargetRuntime = "default" | "tensorrt";
+
 export interface BuildOptions {
   opsetVersion: number;
   phoneLen: number;
+  exportMode?: ExportMode;
+  targetRuntime?: TargetRuntime;
 }
 
 /**
@@ -29,10 +34,18 @@ export function buildOnnxModel(
   checkpoint: ParsedCheckpoint,
   options: BuildOptions
 ): OnnxModel {
-  const { opsetVersion, phoneLen } = options;
+  const {
+    opsetVersion,
+    phoneLen,
+    exportMode = "default",
+    targetRuntime = "default",
+  } = options;
 
   // Build the synthesizer graph
-  const graph = buildSynthesizerGraph(checkpoint, phoneLen);
+  const graph = buildSynthesizerGraph(checkpoint, phoneLen, {
+    exportMode,
+    targetRuntime,
+  });
 
   return {
     irVersion: 8n, // ONNX IR version 8

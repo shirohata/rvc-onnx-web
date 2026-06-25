@@ -60,6 +60,12 @@ import {
   shape,
 } from "./onnx-builder.js";
 
+export interface SynthesizerBuildOptions {
+  exportMode?: "default" | "webui";
+  targetRuntime?: "default" | "tensorrt";
+}
+
+
 // =============================================================================
 // Helper Functions
 // =============================================================================
@@ -524,11 +530,18 @@ function buildWaveNet(
  */
 export function buildSynthesizerGraph(
   checkpoint: ParsedCheckpoint,
-  phoneLen: number
+  phoneLen: number,
+  options: SynthesizerBuildOptions = {}
 ): OnnxGraph {
   resetNameCounter();
 
   const { config, weights, useF0, version } = checkpoint;
+  const { exportMode = "default", targetRuntime = "default" } = options;
+  const webuiCompatible = exportMode === "webui" || targetRuntime === "tensorrt";
+  const externalNoiseInput = webuiCompatible;
+  const audioOnlyOutput = webuiCompatible;
+  const speakerInputName = webuiCompatible ? "ds" : "sid";
+  const f0InputName = webuiCompatible ? "pitchf" : "nsff0";
   const hiddenDim = version === "v2" ? 768 : 256;
 
   const nodes: OnnxNode[] = [];
@@ -611,22 +624,27 @@ export function buildSynthesizerGraph(
   if (useF0) {
     // pitch: [batch, phone_len]
     inputs.push(valueInfo("pitch", OnnxDataType.INT64, [1, "phone_len"]));
-    // nsff0: [batch, phone_len]
-    inputs.push(valueInfo("nsff0", OnnxDataType.FLOAT, [1, "phone_len"]));
+    // nsff0/pitchf: [batch, phone_len]
+    inputs.push(valueInfo(f0InputName, OnnxDataType.FLOAT, [1, "phone_len"]));
   }
 
-  // sid: [batch] - speaker ID
-  inputs.push(valueInfo("sid", OnnxDataType.INT64, ["batch"]));
+  // sid/ds: [batch] - speaker ID
+  inputs.push(valueInfo(speakerInputName, OnnxDataType.INT64, ["batch"]));
+
+  if (externalNoiseInput) {
+    // rnd: [batch, inter_channels, phone_len] - WebUI/TensorRT-friendly external noise
+    inputs.push(valueInfo("rnd", OnnxDataType.FLOAT, [1, config.interChannels, "phone_len"]));
+  }
 
   // ==========================================================================
-  // Speaker Embedding: g = emb_g(sid).unsqueeze(-1)
+  // Speaker Embedding: g = emb_g(sid/ds).unsqueeze(-1)
   // ==========================================================================
 
   const embGWeight = addWeight("emb_g.weight");
 
   // Gather embedding: [batch] -> [batch, gin_channels]
   const gFlat = uniqueName("g_flat");
-  nodes.push(gather(embGWeight, "sid", gFlat, 0));
+  nodes.push(gather(embGWeight, speakerInputName, gFlat, 0));
 
   // Unsqueeze to [batch, gin_channels, 1]
   const unsqueezeAxes = addInt64Const("unsqueeze_axes_neg1", [-1], [1]);
@@ -661,9 +679,12 @@ export function buildSynthesizerGraph(
   const expLogsP = uniqueName("exp_logs_p");
   nodes.push(exp(logs_p, expLogsP));
 
-  // Random noise (using RandomNormalLike)
-  const noise = uniqueName("noise");
-  nodes.push(randomNormalLike(m_p, noise, 0.0, 1.0));
+  // Random noise. WebUI/TensorRT-compatible exports receive this as rnd
+  // so the graph stays deterministic and avoids RandomNormalLike.
+  const noise = externalNoiseInput ? "rnd" : uniqueName("noise");
+  if (!externalNoiseInput) {
+    nodes.push(randomNormalLike(m_p, noise, 0.0, 1.0));
+  }
 
   // noise * 0.66666
   const noiseScale = addScalar("noise_scale", 0.66666);
@@ -715,13 +736,14 @@ export function buildSynthesizerGraph(
     weights,
     config,
     zMasked,
-    useF0 ? "nsff0" : null,
+    useF0 ? f0InputName : null,
     g,
     useF0,
     addWeight,
     addConstant,
     addInt64Const,
-    addScalar
+    addScalar,
+    targetRuntime === "tensorrt"
   );
 
   // ==========================================================================
@@ -734,10 +756,12 @@ export function buildSynthesizerGraph(
   // Rename final audio output
   nodes.push(node("Identity", [audio], ["audio"]));
 
-  // Add sample rate as constant output
-  const srConst = addInt64Const("sr_const", [config.sr], [1]);
-  nodes.push(node("Identity", [srConst], ["sr"]));
-  outputs.push(valueInfo("sr", OnnxDataType.INT64, [1]));
+  if (!audioOnlyOutput) {
+    // Add sample rate as constant output
+    const srConst = addInt64Const("sr_const", [config.sr], [1]);
+    nodes.push(node("Identity", [srConst], ["sr"]));
+    outputs.push(valueInfo("sr", OnnxDataType.INT64, [1]));
+  }
 
   return {
     name: "RVC_Synthesizer",
@@ -2005,7 +2029,8 @@ function buildHiFiGANDecoder(
     shape: number[]
   ) => string,
   addInt64Const: (name: string, values: number[], shape: number[]) => string,
-  addScalar: (name: string, value: number) => string
+  addScalar: (name: string, value: number) => string,
+  deterministicNoise: boolean = false
 ): string {
   const prefix = "dec.";
   
@@ -2026,7 +2051,8 @@ function buildHiFiGANDecoder(
       addWeight,
       addConstant,
       addInt64Const,
-      addScalar
+      addScalar,
+      deterministicNoise
     );
   }
 
@@ -2284,7 +2310,8 @@ function buildSineGenerator(
   noiseStddev: number = 0.003,
   voicedThreshold: number = 0.0,
   addScalar: (name: string, value: number) => string,
-  addInt64Const: (name: string, values: number[], shape: number[]) => string
+  addInt64Const: (name: string, values: number[], shape: number[]) => string,
+  deterministicNoise: boolean = false
 ): { sineWaveforms: string; voicedMask: string; noise: string } {
   
   // Step 1: Compute voiced/unvoiced mask
@@ -2469,9 +2496,14 @@ function buildSineGenerator(
   const noiseAmplitude = uniqueName("noise_amplitude");
   nodes.push(add(voicedNoiseAmp, unvoicedNoiseAmp, noiseAmplitude));
   
-  // Step 12: Generate noise
+  // Step 12: Generate noise. TensorRT-oriented exports avoid in-graph randomness.
   const noiseRandom = uniqueName("noise_random");
-  nodes.push(randomNormalLike(sineScaled, noiseRandom, 0.0, 1.0));
+  if (deterministicNoise) {
+    const zeroNoiseConst = addScalar(uniqueName("zero_noise"), 0.0);
+    nodes.push(mul(sineScaled, zeroNoiseConst, noiseRandom));
+  } else {
+    nodes.push(randomNormalLike(sineScaled, noiseRandom, 0.0, 1.0));
+  }
   
   const noise = uniqueName("noise");
   nodes.push(mul(noiseAmplitude, noiseRandom, noise));
@@ -2521,7 +2553,8 @@ function buildSourceModuleHnNSF(
   prefix: string,
   addWeight: (name: string) => string,
   addScalar: (name: string, value: number) => string,
-  addInt64Const: (name: string, values: number[], shape: number[]) => string
+  addInt64Const: (name: string, values: number[], shape: number[]) => string,
+  deterministicNoise: boolean = false
 ): string {
   // Generate sine source
   const { sineWaveforms } = buildSineGenerator(
@@ -2534,7 +2567,8 @@ function buildSourceModuleHnNSF(
     0.003, // noise_stddev
     0.0,   // voiced_threshold
     addScalar,
-    addInt64Const
+    addInt64Const,
+    deterministicNoise
   );
   
   // Apply learnable transformation if weights exist
@@ -2608,7 +2642,8 @@ function buildGeneratorNSF(
     shape: number[]
   ) => string,
   addInt64Const: (name: string, values: number[], shape: number[]) => string,
-  addScalar: (name: string, value: number) => string
+  addScalar: (name: string, value: number) => string,
+  deterministicNoise: boolean = false
 ): string {
   // Calculate total upsampling factor
   const totalUpsample = config.upsampleRates.reduce((a, b) => a * b, 1);
@@ -2626,7 +2661,8 @@ function buildGeneratorNSF(
       `${prefix}m_source.`,
       addWeight,
       addScalar,
-      addInt64Const
+      addInt64Const,
+      deterministicNoise
     );
   }
   

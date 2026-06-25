@@ -10,11 +10,18 @@ import type { ParsedCheckpoint } from "./types.js";
 /**
  * Options for the conversion process.
  */
+export type ExportMode = "default" | "webui";
+export type TargetRuntime = "default" | "tensorrt";
+
 export interface ConversionOptions {
   /** ONNX opset version (default: 17) */
   opsetVersion?: number;
   /** Sequence length for the model's phone input dimension */
   phoneLen?: number;
+  /** Export compatibility mode (default: "default") */
+  exportMode?: ExportMode;
+  /** Runtime target for compatibility-oriented graph choices (default: "default") */
+  targetRuntime?: TargetRuntime;
   /** Whether to run simplification passes */
   simplify?: boolean;
 }
@@ -189,7 +196,13 @@ export async function pthToOnnx(
   // Normalize input to ArrayBuffer
   const pthBuffer = await normalizeInput(input);
   
-  const { opsetVersion = 17, phoneLen = 100, simplify = false } = options;
+  const {
+    opsetVersion = 17,
+    phoneLen = 100,
+    exportMode = "default",
+    targetRuntime = "default",
+    simplify = false,
+  } = options;
 
   // Step 1: Parse the .pth file to extract weights and config
   const checkpoint = await parsePth(pthBuffer);
@@ -198,6 +211,8 @@ export async function pthToOnnx(
   const onnxModel = buildOnnxModel(checkpoint, {
     opsetVersion,
     phoneLen,
+    exportMode,
+    targetRuntime,
   });
 
   // Step 3: Serialize to binary ONNX format (protobuf)
